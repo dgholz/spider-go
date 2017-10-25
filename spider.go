@@ -80,5 +80,4 @@ func main() {
     }
     getLinks(res.Body)
     res.Body.Close()
-
 }
