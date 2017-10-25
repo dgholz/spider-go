@@ -17,32 +17,40 @@ func parseArgs() {
     }
 }
 
-func extractAnchorHref(getElement <-chan *html.Node, sendUrl chan<- *url.URL) {
-    for node := range getElement {
-        if node.Type == html.ElementNode && node.Data == "a" {
-            for _, attr := range node.Attr {
-                if attr.Key == "href" && attr.Val != "" {
-                    url, err := url.Parse(attr.Val)
-                    if err == nil {
-                        sendUrl <- url
+func extractAnchorHref(getElement <-chan *html.Node) (<-chan *url.URL) {
+    sendUrl := make(chan *url.URL)
+    go func() {
+        for node := range getElement {
+            if node.Type == html.ElementNode && node.Data == "a" {
+                for _, attr := range node.Attr {
+                    if attr.Key == "href" && attr.Val != "" {
+                        url, err := url.Parse(attr.Val)
+                        if err == nil {
+                            sendUrl <- url
+                        }
                     }
                 }
             }
         }
-    }
-    close(sendUrl)
+        close(sendUrl)
+    }()
+    return sendUrl
 }
 
-func visitAllChildren(doc *html.Node, sendElement chan<- *html.Node) {
-    var f func(*html.Node)
-    f = func(n *html.Node) {
-        for c := n.FirstChild; c != nil; c = c.NextSibling {
-            sendElement <- c
-            f(c)
+func visitAllChildren(doc *html.Node) (<-chan *html.Node) {
+    sendElement := make(chan *html.Node)
+    go func() {
+        var f func(*html.Node)
+        f = func(n *html.Node) {
+            for c := n.FirstChild; c != nil; c = c.NextSibling {
+                sendElement <- c
+                f(c)
+            }
         }
-    }
-    f(doc)
-    close(sendElement)
+        f(doc)
+        close(sendElement)
+    }()
+    return sendElement
 }
 
 func getLinks(stream io.Reader) {
@@ -51,10 +59,8 @@ func getLinks(stream io.Reader) {
         fmt.Println(err)
         return
     }
-    elements := make(chan *html.Node)
-    urls := make(chan *url.URL)
-    go visitAllChildren(doc, elements)
-    go extractAnchorHref(elements, urls)
+    elements := visitAllChildren(doc)
+    urls := extractAnchorHref(elements)
     for url := range urls {
         fmt.Println(url)
     }
