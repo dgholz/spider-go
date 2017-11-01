@@ -93,13 +93,13 @@ func matchNetloc(baseUrl *url.URL) urlfilter {
 
 func main() {
     parseArgs()
-    url, err := url.Parse(flag.Arg(0))
+    startUrl, err := url.Parse(flag.Arg(0))
     if err != nil {
         fmt.Println("Trouble parsing the site to spider!", err)
         os.Exit(1)
     }
 
-    for url := range getLinks(url) {
-        fmt.Println(url)
+    for seen := range getLinks(startUrl) {
+        fmt.Println(seen)
     }
 }
