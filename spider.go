@@ -100,18 +100,18 @@ func matchNetloc(baseUrl *url.URL) urlfilter {
 }
 
 func spider(toVisit <-chan *url.URL) (<-chan *url.URL) {
-    seenUrls := make(chan *url.URL)
+    visitedUrls := make(chan *url.URL)
     go func() {
         for url := range toVisit {
             go func() {
-                for seenUrl := range getLinks(url) {
-                    seenUrls <- seenUrl
+                for visited := range getLinks(url) {
+                    visitedUrls <- visited
                 }
-                close(seenUrls)
+                close(visitedUrls)
             }()
         }
     }()
-    return seenUrls
+    return visitedUrls
 }
 
 func main() {
