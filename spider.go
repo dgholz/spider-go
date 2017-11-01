@@ -91,6 +91,21 @@ func matchNetloc(baseUrl *url.URL) urlfilter {
     }
 }
 
+func spider(toVisit <-chan *url.URL) (<-chan *url.URL) {
+    seenUrls := make(chan *url.URL)
+    go func() {
+        for url := range toVisit {
+            go func() {
+                for seenUrl := range getLinks(url) {
+                    seenUrls <- seenUrl
+                }
+                close(seenUrls)
+            }()
+        }
+    }()
+    return seenUrls
+}
+
 func main() {
     parseArgs()
     startUrl, err := url.Parse(flag.Arg(0))
@@ -98,8 +113,11 @@ func main() {
         fmt.Println("Trouble parsing the site to spider!", err)
         os.Exit(1)
     }
+    toVisit := make(chan *url.URL)
+    visited := spider(toVisit)
+    toVisit <- startUrl
 
-    for seen := range getLinks(startUrl) {
+    for seen := range visited {
         fmt.Println(seen)
     }
 }
