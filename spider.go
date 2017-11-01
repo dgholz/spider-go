@@ -69,7 +69,26 @@ func getLinks(url *url.URL) (<-chan *url.URL) {
 
     elements := visitAllChildren(doc)
     urls := extractAnchorHref(elements)
-    return urls
+    sameSite := matchNetloc(url)(urls)
+    return sameSite
+}
+
+type urlfilter func(<-chan *url.URL) (<-chan *url.URL)
+
+func matchNetloc(baseUrl *url.URL) urlfilter {
+    return func(getUrl <-chan *url.URL) (<-chan *url.URL) {
+        filteredUrls := make(chan *url.URL)
+        go func() {
+            for url := range getUrl {
+                abs := baseUrl.ResolveReference(url)
+                if(abs.Host == baseUrl.Host) {
+                    filteredUrls <- abs
+                }
+            }
+            close(filteredUrls)
+        }()
+        return filteredUrls
+    }
 }
 
 func main() {
