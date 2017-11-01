@@ -1,6 +1,6 @@
 package main
 
-import ("flag";"fmt";"os";"path")
+import ("flag";"fmt";"os";"path";"strings")
 import ("net/http";"net/url")
 import "golang.org/x/net/html"
 
@@ -21,14 +21,22 @@ func extractAnchorHref(getElement <-chan *html.Node) (<-chan *url.URL) {
     sendUrl := make(chan *url.URL)
     go func() {
         for node := range getElement {
-            if node.Type == html.ElementNode && node.Data == "a" {
-                for _, attr := range node.Attr {
-                    if attr.Key == "href" && attr.Val != "" {
-                        url, err := url.Parse(attr.Val)
-                        if err == nil {
-                            sendUrl <- url
-                        }
+            if node.Type != html.ElementNode || node.Data != "a" {
+                continue
+            }
+
+            for _, attr := range node.Attr {
+                if attr.Key != "href" {
+                    continue
+                }
+
+                val := strings.TrimSpace(attr.Val)
+                if val != "" {
+                    url, err := url.Parse(val)
+                    if err == nil {
+                        sendUrl <- url
                     }
+                    break
                 }
             }
         }
