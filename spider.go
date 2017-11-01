@@ -1,6 +1,6 @@
 package main
 
-import ("flag";"fmt";"io";"os";"path")
+import ("flag";"fmt";"os";"path")
 import ("net/http";"net/url")
 import "golang.org/x/net/html"
 
@@ -53,17 +53,23 @@ func visitAllChildren(doc *html.Node) (<-chan *html.Node) {
     return sendElement
 }
 
-func getLinks(stream io.Reader) {
-    doc, err := html.Parse(stream)
+func getLinks(url *url.URL) (<-chan *url.URL) {
+    res, err := http.Get(url.String())
+    if err != nil {
+        fmt.Println("Trouble fetching the URL!", err)
+        return nil
+    }
+
+    doc, err := html.Parse(res.Body)
+    res.Body.Close()
     if err != nil {
         fmt.Println(err)
-        return
+        return nil
     }
+
     elements := visitAllChildren(doc)
     urls := extractAnchorHref(elements)
-    for url := range urls {
-        fmt.Println(url)
-    }
+    return urls
 }
 
 func main() {
@@ -73,11 +79,8 @@ func main() {
         fmt.Println("Trouble parsing the site to spider!", err)
         os.Exit(1)
     }
-    res, err := http.Get(url.String())
-    if err != nil {
-        fmt.Println("Trouble fetching the URL!", err)
-        os.Exit(1)
+
+    for url := range getLinks(url) {
+        fmt.Println(url)
     }
-    getLinks(res.Body)
-    res.Body.Close()
 }
