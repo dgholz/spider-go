@@ -99,13 +99,20 @@ func matchNetloc(baseUrl *url.URL) urlfilter {
     }
 }
 
-func spider(toVisit <-chan *url.URL) (<-chan *url.URL) {
-    visitedUrls := make(chan *url.URL)
+type VisitLink struct {
+    from, to *url.URL
+}
+func (v VisitLink) get() (from *url.URL, to *url.URL) {
+    return v.from, v.to
+}
+
+func spider(toVisit <-chan *url.URL) (<-chan VisitLink) {
+    visitedUrls := make(chan VisitLink)
     go func() {
         for url := range toVisit {
             go func() {
                 for visited := range getLinks(url) {
-                    visitedUrls <- visited
+                    visitedUrls <- VisitLink{url, visited}
                 }
                 close(visitedUrls)
             }()
@@ -125,7 +132,28 @@ func main() {
     visited := spider(toVisit)
     toVisit <- startUrl
 
-    for seen := range visited {
-        fmt.Println(seen)
+    type visitRecord map[*url.URL]bool
+    seen := map[*url.URL]visitRecord {
+        startUrl: make(visitRecord),
+    }
+
+    for link := range visited {
+        origin, dest := link.get()
+        dest.Fragment = ""
+        seen[origin][dest] = true
+        _, alreadySeen := seen[dest]
+        if ! alreadySeen {
+             seen[dest] = make(visitRecord)
+             toVisit <- dest
+        }
+    }
+
+    for k, v := range seen {
+        fmt.Println(k)
+        for s := range v {
+            if s != k {
+                fmt.Println(" * ", s)
+            }
+        }
     }
 }
