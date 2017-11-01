@@ -11,7 +11,7 @@ func parseArgs() {
     }
 
     flag.Parse()
-    if flag.NArg() == 0 {
+    if flag.NArg() != 1 {
         flag.Usage()
         os.Exit(1)
     }
