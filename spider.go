@@ -2,6 +2,7 @@ package main
 
 import ("flag";"fmt";"os";"path";"strings")
 import ("net/http";"net/url")
+import "sync"
 import "golang.org/x/net/html"
 
 func parseArgs() {
@@ -106,11 +107,12 @@ func (v VisitLink) get() (from *url.URL, to *url.URL) {
     return v.from, v.to
 }
 
-func spider(toVisit <-chan *url.URL) (<-chan VisitLink) {
+func spider(toVisit <-chan *url.URL, wait *sync.WaitGroup) (<-chan VisitLink) {
     sendVisited := make(chan VisitLink)
     go func() {
         for nextUrl := range toVisit {
             go func(fromUrl *url.URL) {
+                defer wait.Done()
                 links, err := getLinks(fromUrl)
                 if err != nil {
                     return
@@ -118,9 +120,9 @@ func spider(toVisit <-chan *url.URL) (<-chan VisitLink) {
                 for visited := range links {
                     sendVisited <- VisitLink{fromUrl, visited}
                 }
-                close(visitedUrls)
             }(nextUrl)
         }
+        close(sendVisited)
     }()
     return sendVisited
 }
@@ -133,8 +135,15 @@ func main() {
         os.Exit(1)
     }
     toVisit := make(chan *url.URL)
-    visited := spider(toVisit)
+    var wg sync.WaitGroup
+    visited := spider(toVisit, &wg)
+    wg.Add(1)
     toVisit <- startUrl
+
+    go func() {
+        wg.Wait()
+        close(toVisit)
+    }()
 
     type visitRecord map[string]bool
     seen := map[string]visitRecord {
@@ -147,6 +156,7 @@ func main() {
         seen[origin.String()][dest.String()] = true
         _, alreadySeen := seen[dest.String()]
         if ! alreadySeen {
+            wg.Add(1)
             seen[dest.String()] = make(visitRecord)
             toVisit <- dest
         }
