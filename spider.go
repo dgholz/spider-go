@@ -136,19 +136,19 @@ func main() {
     visited := spider(toVisit)
     toVisit <- startUrl
 
-    type visitRecord map[*url.URL]bool
-    seen := map[*url.URL]visitRecord {
-        startUrl: make(visitRecord),
+    type visitRecord map[string]bool
+    seen := map[string]visitRecord {
+        startUrl.String(): make(visitRecord),
     }
 
     for link := range visited {
         origin, dest := link.get()
         dest.Fragment = ""
-        seen[origin][dest] = true
-        _, alreadySeen := seen[dest]
+        seen[origin.String()][dest.String()] = true
+        _, alreadySeen := seen[dest.String()]
         if ! alreadySeen {
-             seen[dest] = make(visitRecord)
-             toVisit <- dest
+            seen[dest.String()] = make(visitRecord)
+            toVisit <- dest
         }
     }
 
