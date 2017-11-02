@@ -61,24 +61,24 @@ func visitAllChildren(doc *html.Node) (<-chan *html.Node) {
     return sendElement
 }
 
-func getLinks(url *url.URL) (<-chan *url.URL) {
+func getLinks(url *url.URL) (<-chan *url.URL, error) {
     res, err := http.Get(url.String())
     if err != nil {
         fmt.Println("Trouble fetching the URL!", err)
-        return nil
+        return nil, err
     }
 
     doc, err := html.Parse(res.Body)
     res.Body.Close()
     if err != nil {
         fmt.Println(err)
-        return nil
+        return nil, err
     }
 
     elements := visitAllChildren(doc)
     urls := extractAnchorHref(elements)
     sameSite := matchNetloc(url)(urls)
-    return sameSite
+    return sameSite, nil
 }
 
 type urlfilter func(<-chan *url.URL) (<-chan *url.URL)
@@ -111,8 +111,12 @@ func spider(toVisit <-chan *url.URL) (<-chan VisitLink) {
     go func() {
         for nextUrl := range toVisit {
             go func(fromUrl *url.URL) {
-                for visited := range getLinks(url) {
-                    visitedUrls <- VisitLink{url, visited}
+                links, err := getLinks(fromUrl)
+                if err != nil {
+                    return
+                }
+                for visited := range links {
+                    sendVisited <- VisitLink{fromUrl, visited}
                 }
                 close(visitedUrls)
             }(nextUrl)
