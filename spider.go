@@ -110,12 +110,12 @@ func spider(toVisit <-chan *url.URL) (<-chan VisitLink) {
     sendVisited := make(chan VisitLink)
     go func() {
         for nextUrl := range toVisit {
-            go func() {
+            go func(fromUrl *url.URL) {
                 for visited := range getLinks(url) {
                     visitedUrls <- VisitLink{url, visited}
                 }
                 close(visitedUrls)
-            }()
+            }(nextUrl)
         }
     }()
     return sendVisited
