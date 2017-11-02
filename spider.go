@@ -3,9 +3,11 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path"
 	"strings"
+	"text/template"
 )
 import (
 	"net/http"
@@ -137,6 +139,17 @@ func spider(toVisit <-chan *url.URL, wait *sync.WaitGroup) <-chan VisitLink {
 	return sendVisited
 }
 
+type visitRecord map[string]bool
+
+func formatSitemap(seen map[string]visitRecord, out io.Writer) {
+	const sitemapTmpl = `{{range $page, $links := .}}{{$page}}{{"\n"}}{{range $link, $i := $links}}{{if and $i (ne $link $page)}} * {{$link}}{{"\n"}}{{end}}{{end}}{{end}}`
+	t := template.Must(template.New("sitemap").Parse(sitemapTmpl))
+	err := t.Execute(out, seen)
+	if err != nil {
+		panic(err)
+	}
+}
+
 func main() {
 	parseArgs()
 	startUrl, err := url.Parse(flag.Arg(0))
@@ -155,7 +168,6 @@ func main() {
 		close(toVisit)
 	}()
 
-	type visitRecord map[string]bool
 	seen := map[string]visitRecord{
 		startUrl.String(): make(visitRecord),
 	}
@@ -172,12 +184,5 @@ func main() {
 		}
 	}
 
-	for k, v := range seen {
-		fmt.Println(k)
-		for s := range v {
-			if s != k {
-				fmt.Println(" * ", s)
-			}
-		}
-	}
+	formatSitemap(seen, os.Stdout)
 }
